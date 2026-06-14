@@ -334,13 +334,11 @@ static uint8_t Multiply(uint8_t x, uint8_t y)
 #endif
 
 #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
-/*
-static uint8_t getSBoxInvert(uint8_t num)
+
+static inline uint8_t getSBoxInvert(uint8_t num)
 {
   return rsbox[num];
 }
-*/
-#define getSBoxInvert(num) (rsbox[(num)])
 
 // MixColumns function mixes the columns of the state matrix.
 // The method used to multiply may be difficult to understand for the inexperienced.
