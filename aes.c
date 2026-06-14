@@ -134,13 +134,11 @@ static const uint8_t Rcon[11] = {
 /*****************************************************************************/
 /* Private functions:                                                        */
 /*****************************************************************************/
-/*
-static uint8_t getSBoxValue(uint8_t num)
+
+static inline uint8_t getSBoxValue(uint8_t num)
 {
   return sbox[num];
 }
-*/
-#define getSBoxValue(num) (sbox[(num)])
 
 // This function produces Nb(Nr+1) round keys. The round keys are used in each round to decrypt the states. 
 static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
