@@ -140,6 +140,26 @@ static inline uint8_t getSBoxValue(uint8_t num)
   return sbox[num];
 }
 
+// This function shifts the 4 bytes in a word to the left once.
+// in [a0,a1,a2,a3] becomes out [a1,a2,a3,a0]
+static void RotWord(const uint8_t *restrict in, uint8_t *restrict out)
+{
+  out[0] = in[1];
+  out[1] = in[2];
+  out[2] = in[3];
+  out[3] = in[0];
+}
+
+// SubWord() is a function that takes a four-byte input word and 
+// applies the S-box to each of the four bytes to produce an output word.
+static void SubWord(uint8_t in[4], uint8_t out[4])
+{
+  out[0] = getSBoxValue(in[0]);
+  out[1] = getSBoxValue(in[1]);
+  out[2] = getSBoxValue(in[2]);
+  out[3] = getSBoxValue(in[3]);
+}
+
 // This function produces Nb(Nr+1) round keys. The round keys are used in each round to decrypt the states. 
 static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
 {
@@ -169,41 +189,17 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
 
     if (i % Nk == 0)
     {
-      // This function shifts the 4 bytes in a word to the left once.
-      // [a0,a1,a2,a3] becomes [a1,a2,a3,a0]
-
-      // Function RotWord()
       {
-        const uint8_t u8tmp = tempa[0];
-        tempa[0] = tempa[1];
-        tempa[1] = tempa[2];
-        tempa[2] = tempa[3];
-        tempa[3] = u8tmp;
-      }
-
-      // SubWord() is a function that takes a four-byte input word and 
-      // applies the S-box to each of the four bytes to produce an output word.
-
-      // Function Subword()
-      {
-        tempa[0] = getSBoxValue(tempa[0]);
-        tempa[1] = getSBoxValue(tempa[1]);
-        tempa[2] = getSBoxValue(tempa[2]);
-        tempa[3] = getSBoxValue(tempa[3]);
+      uint8_t buffB[4];
+      RotWord(tempa, buffB);
+      SubWord(buffB, tempa);
       }
 
       tempa[0] = tempa[0] ^ Rcon[i/Nk];
     }
 #if defined(AES256) && (AES256 == 1)
-    if (i % Nk == 4)
-    {
-      // Function Subword()
-      {
-        tempa[0] = getSBoxValue(tempa[0]);
-        tempa[1] = getSBoxValue(tempa[1]);
-        tempa[2] = getSBoxValue(tempa[2]);
-        tempa[3] = getSBoxValue(tempa[3]);
-      }
+    if (i % Nk == 4) {
+      SubWord(tempa, tempa);
     }
 #endif
     j = i * 4; k=(i - Nk) * 4;
