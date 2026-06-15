@@ -245,15 +245,15 @@ static void AddRoundKey(uint8_t round, state_t* state, const uint8_t* RoundKey)
 }
 
 // The SubBytes Function Substitutes the values in the
-// state matrix with values in an S-box.
-static void SubBytes(state_t* state)
-{
+// state matrix with values in an S-box or RS-box.
+
+static void SubBytes_map(state_t* state,const uint8_t* box){
   uint8_t i, j;
   for (i = 0; i < 4; ++i)
   {
     for (j = 0; j < 4; ++j)
     {
-      (*state)[j][i] = getSBoxValue((*state)[j][i]);
+      (*state)[j][i] = box[(*state)[j][i]];
     }
   }
 }
@@ -362,20 +362,6 @@ static void InvMixColumns(state_t* state)
 }
 
 
-// The SubBytes Function Substitutes the values in the
-// state matrix with values in an S-box.
-static void InvSubBytes(state_t* state)
-{
-  uint8_t i, j;
-  for (i = 0; i < 4; ++i)
-  {
-    for (j = 0; j < 4; ++j)
-    {
-      (*state)[j][i] = getSBoxInvert((*state)[j][i]);
-    }
-  }
-}
-
 static void InvShiftRows(state_t* state)
 {
   uint8_t temp;
@@ -419,7 +405,7 @@ static void Cipher(state_t* state, const uint8_t* RoundKey)
   // Last one without MixColumns()
   for (round = 1; ; ++round)
   {
-    SubBytes(state);
+    SubBytes_map(state, sbox);
     ShiftRows(state);
     if (round == Nr) {
       break;
@@ -446,7 +432,7 @@ static void InvCipher(state_t* state, const uint8_t* RoundKey)
   for (round = (Nr - 1); ; --round)
   {
     InvShiftRows(state);
-    InvSubBytes(state);
+    SubBytes_map(state, rsbox);
     AddRoundKey(round, state, RoundKey);
     if (round == 0) {
       break;
