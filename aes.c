@@ -55,13 +55,6 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
     #define Nr 10       // The number of rounds in AES Cipher.
 #endif
 
-// jcallan@github points out that declaring Multiply as a function 
-// reduces code size considerably with the Keil ARM compiler.
-// See this link for more information: https://github.com/kokke/tiny-AES-C/pull/3
-#ifndef MULTIPLY_AS_A_FUNCTION
-  #define MULTIPLY_AS_A_FUNCTION 0
-#endif
-
 
 
 
@@ -291,70 +284,39 @@ static uint8_t xtime(uint8_t x)
 }
 
 // MixColumns function mixes the columns of the state matrix
-static void MixColumns(state_t* state)
+static void MixColumns(state_t* state, uint8_t inverse)
 {
   uint8_t i;
-  uint8_t Tmp, Tm, t;
   for (i = 0; i < 4; ++i)
-  {  
-    t   = (*state)[i][0];
-    Tmp = (*state)[i][0] ^ (*state)[i][1] ^ (*state)[i][2] ^ (*state)[i][3] ;
-    Tm  = (*state)[i][0] ^ (*state)[i][1] ; Tm = xtime(Tm);  (*state)[i][0] ^= Tm ^ Tmp ;
-    Tm  = (*state)[i][1] ^ (*state)[i][2] ; Tm = xtime(Tm);  (*state)[i][1] ^= Tm ^ Tmp ;
-    Tm  = (*state)[i][2] ^ (*state)[i][3] ; Tm = xtime(Tm);  (*state)[i][2] ^= Tm ^ Tmp ;
-    Tm  = (*state)[i][3] ^ t ;              Tm = xtime(Tm);  (*state)[i][3] ^= Tm ^ Tmp ;
+  {
+    uint8_t s0 = (*state)[i][0];
+    uint8_t s1 = (*state)[i][1];
+    uint8_t s2 = (*state)[i][2];
+    uint8_t s3 = (*state)[i][3];
+    uint8_t Tmp = s0 ^ s1 ^ s2 ^ s3;
+    (*state)[i][0] = s0 ^ xtime(s0 ^ s1) ^ Tmp;
+    (*state)[i][1] = s1 ^ xtime(s1 ^ s2) ^ Tmp;
+    (*state)[i][2] = s2 ^ xtime(s2 ^ s3) ^ Tmp;
+    (*state)[i][3] = s3 ^ xtime(s3 ^ s0) ^ Tmp;
+
+    if (inverse)
+    {
+      uint8_t x = xtime(xtime((*state)[i][0] ^ (*state)[i][2]));
+      uint8_t y = xtime(xtime((*state)[i][1] ^ (*state)[i][3]));
+      
+      (*state)[i][0] ^= x;
+      (*state)[i][1] ^= y;
+      (*state)[i][2] ^= x;
+      (*state)[i][3] ^= y;
+    }
   }
 }
-
-// Multiply is used to multiply numbers in the field GF(2^8)
-// Note: The last call to xtime() is unneeded, but often ends up generating a smaller binary
-//       The compiler seems to be able to vectorize the operation better this way.
-//       See https://github.com/kokke/tiny-AES-c/pull/34
-#if MULTIPLY_AS_A_FUNCTION
-static uint8_t Multiply(uint8_t x, uint8_t y)
-{
-  return (((y & 1) * x) ^
-       ((y>>1 & 1) * xtime(x)) ^
-       ((y>>2 & 1) * xtime(xtime(x))) ^
-       ((y>>3 & 1) * xtime(xtime(xtime(x)))) ^
-       ((y>>4 & 1) * xtime(xtime(xtime(xtime(x)))))); /* this last call to xtime() can be omitted */
-  }
-#else
-#define Multiply(x, y)                                \
-      (  ((y & 1) * x) ^                              \
-      ((y>>1 & 1) * xtime(x)) ^                       \
-      ((y>>2 & 1) * xtime(xtime(x))) ^                \
-      ((y>>3 & 1) * xtime(xtime(xtime(x)))) ^         \
-      ((y>>4 & 1) * xtime(xtime(xtime(xtime(x))))))   \
-
-#endif
 
 #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
 static inline uint8_t getSBoxInvert(uint8_t num)
 {
   return rsbox[num];
-}
-
-// MixColumns function mixes the columns of the state matrix.
-// The method used to multiply may be difficult to understand for the inexperienced.
-// Please use the references to gain more information.
-static void InvMixColumns(state_t* state)
-{
-  int i;
-  uint8_t a, b, c, d;
-  for (i = 0; i < 4; ++i)
-  { 
-    a = (*state)[i][0];
-    b = (*state)[i][1];
-    c = (*state)[i][2];
-    d = (*state)[i][3];
-
-    (*state)[i][0] = Multiply(a, 0x0e) ^ Multiply(b, 0x0b) ^ Multiply(c, 0x0d) ^ Multiply(d, 0x09);
-    (*state)[i][1] = Multiply(a, 0x09) ^ Multiply(b, 0x0e) ^ Multiply(c, 0x0b) ^ Multiply(d, 0x0d);
-    (*state)[i][2] = Multiply(a, 0x0d) ^ Multiply(b, 0x09) ^ Multiply(c, 0x0e) ^ Multiply(d, 0x0b);
-    (*state)[i][3] = Multiply(a, 0x0b) ^ Multiply(b, 0x0d) ^ Multiply(c, 0x09) ^ Multiply(d, 0x0e);
-  }
 }
 
 
@@ -406,7 +368,7 @@ static void Cipher(state_t* state, const uint8_t* RoundKey)
     if (round == Nr) {
       break;
     }
-    MixColumns(state);
+    MixColumns(state, 0);
     AddRoundKey(round, state, RoundKey);
   }
   // Add round key to last round
@@ -433,7 +395,7 @@ static void InvCipher(state_t* state, const uint8_t* RoundKey)
     if (round == 0) {
       break;
     }
-    InvMixColumns(state);
+    MixColumns(state, 1);
   }
 
 }
